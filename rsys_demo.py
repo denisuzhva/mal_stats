@@ -21,8 +21,11 @@ if __name__ == '__main__':
     user = os.getenv('USER')
     password = os.getenv('PASSWORD')
     dbname = os.getenv('DBNAME')
+    datapath = os.getenv('DATAPATH')
 
     db_manager = DatabaseManager(host, port, user, password, dbname)
     if config.getboolean('ETL', 'do_etl'):
         etl_main(db_manager, do_extract=False,
-                 data_dir='O:/dev/_ml/mal_stats/data/svanoo')
+                 data_dir=datapath,
+                 user_fields=None,
+                 rating_fields=None)
