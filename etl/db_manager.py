@@ -29,7 +29,9 @@ class DatabaseManager():
     def pd_to_sql_dtypes(dtype_list):
         data_list = []
         for x in dtype_list:
-            if (x == 'int32') or (x == 'int64'):
+            if (x == 'int8'):
+                data_list.append('smallint')
+            elif (x == 'int32') or (x == 'int64'):
                 data_list.append('int')
             elif (x == 'float32') or (x == 'float64'):
                 data_list.append('float')
@@ -83,10 +85,10 @@ class DatabaseManager():
             df.to_csv(output, sep='\t', header=False, index=False)
             output.seek(0)
             # contents = output.getvalue()
-            conn = self.engine.raw_connection()
-            with conn.cursor() as cur:
-                cur.copy_from(output, table_name, null="")
-                conn.commit()
+            db_conn = self.engine.raw_connection()
+            with db_conn.cursor() as db_cur:
+                db_cur.copy_from(output, table_name, null="")
+                db_conn.commit()
         except ValueError as e:
             return e
 
@@ -117,5 +119,40 @@ class DatabaseManager():
     def drop_table(self, table_name):
         query = f"""
             DROP TABLE IF EXISTS {table_name}
+        """
+        self.execute_query(query, autocommit=True)
+
+    def popular_minmax_filter(self,
+                              table_name,
+                              filtered_table_name,
+                              user_id_col, item_id_col, rating_col,
+                              sample_fraction=1, top_popular=500,
+                              min_items=5, max_items=10000):
+        query = f"""
+            WITH top_popular AS (
+                SELECT 
+                    count(*) AS popularity, 
+                    {item_id_col}
+                FROM {table_name}
+                GROUP BY {item_id_col}
+                ORDER BY popularity DESC
+                LIMIT {top_popular}
+            )
+            SELECT
+                {user_id_col},
+                {item_id_col},
+                {rating_col},
+                num_items
+            INTO {filtered_table_name}
+            FROM (
+                SELECT 
+                    r.{user_id_col},
+                    r.{item_id_col},
+                    r.{rating_col},
+                    count(*) OVER (PARTITION BY {user_id_col}) AS num_items
+                FROM {table_name} r TABLESAMPLE SYSTEM ({sample_fraction})
+                INNER JOIN top_popular t ON r.{item_id_col} = t.{item_id_col}
+            ) top_filtered
+            WHERE num_items >= {min_items} AND num_items <= {max_items}
         """
         self.execute_query(query, autocommit=True)
