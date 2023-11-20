@@ -1,2 +1,4 @@
-# mal_stats
-MyAnimeList statistics 
+# Recommender system for MyAnimeList
+MyAnimeList recommender
+
+Stay tuned!
